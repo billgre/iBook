@@ -1,0 +1,51 @@
+import random
+import tkinter as tk
+from tkinter import ttk
+
+# Load BIP39 wordlist
+with open('english.txt', 'r') as f:
+    wordlist = f.read().splitlines()
+
+# Define function to generate book
+def generate_book(num_pages, rows_per_page):
+    # Clear existing book
+    book_text.delete("1.0", tk.END)
+
+    # Generate new book
+    for page in range(num_pages):
+        book_text.insert(tk.END, f"Page {page+1}:\n")
+        for row in range(rows_per_page):
+            words = [random.choice(wordlist) for i in range(words_per_row)]
+            book_text.insert(tk.END, " ".join(words) + "\n")
+        book_text.insert(tk.END, "\n")
+
+# Define function to handle button click
+def generate_book_click():
+    num_pages = int(num_pages_entry.get())
+    rows_per_page = int(rows_per_page_entry.get())
+    generate_book(num_pages, rows_per_page)
+
+# Create GUI
+root = tk.Tk()
+root.title("Random Word Book Generator")
+
+# Create input fields
+ttk.Label(root, text="Number of Pages:").grid(column=0, row=0, padx=5, pady=5)
+num_pages_entry = ttk.Entry(root, width=10)
+num_pages_entry.insert(0, "24")
+num_pages_entry.grid(column=1, row=0, padx=5, pady=5)
+
+ttk.Label(root, text="Rows per Page:").grid(column=0, row=1, padx=5, pady=5)
+rows_per_page_entry = ttk.Entry(root, width=10)
+rows_per_page_entry.insert(0, "24")
+rows_per_page_entry.grid(column=1, row=1, padx=5, pady=5)
+
+# Create button to generate book
+generate_button = ttk.Button(root, text="Generate Book", command=generate_book_click)
+generate_button.grid(column=0, row=2, padx=5, pady=5, columnspan=2)
+
+# Create text area to display book
+book_text = tk.Text(root, height=20, width=60)
+book_text.grid(column=0, row=3, padx=5, pady=5, columnspan=2)
+
+root.mainloop()
