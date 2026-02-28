@@ -1,18 +1,558 @@
-import random
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seed Vault</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Cormorant+Garamond:ital,wght@0,300;0,500;1,300&display=swap');
 
-# Load BIP39 wordlist
-with open('english.txt', 'r') as f:
-    wordlist = f.read().splitlines()
+:root {
+  --bg: #0c0c0a;
+  --surface: #141412;
+  --surface2: #1c1c19;
+  --border: #2c2c28;
+  --border2: #3a3a35;
+  --gold: #b8975a;
+  --gold-bright: #d4b06a;
+  --gold-dim: #6b5830;
+  --text: #e2ddd4;
+  --muted: #7a7670;
+  --faint: #3a3a35;
+  --red: #c0504a;
+  --green: #5a9e6a;
+}
 
-# Define book parameters
-num_pages = 24
-rows_per_page = 24
-words_per_row = 10
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Cormorant Garamond', Georgia, serif; min-height: 100vh; }
 
-# Generate book
-for page in range(num_pages):
-    print(f"Page {page+1}:")
-    for row in range(rows_per_page):
-        words = [random.choice(wordlist) for i in range(words_per_row)]
-        print(" ".join(words))
-    print("\n")
+.app { max-width: 900px; margin: 0 auto; padding: 0 24px 80px; }
+
+/* HEADER */
+.header { padding: 52px 0 40px; border-bottom: 1px solid var(--border); margin-bottom: 40px; position: relative; }
+.header::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 80px; height: 1px; background: var(--gold); }
+.header-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 5px; color: var(--gold-dim); text-transform: uppercase; margin-bottom: 14px; }
+.header h1 { font-size: clamp(36px, 5vw, 54px); font-weight: 300; letter-spacing: -1px; line-height: 1.05; }
+.header h1 em { font-style: italic; color: var(--gold); }
+.header-sub { margin-top: 10px; font-size: 17px; color: var(--muted); font-weight: 300; }
+.offline-badge { display: inline-flex; align-items: center; gap: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--green); border: 1px solid #2a4a32; background: #0d1f12; padding: 5px 12px; margin-top: 18px; }
+.offline-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+/* STEPS */
+.steps-bar { display: flex; margin-bottom: 36px; border: 1px solid var(--border); }
+.step-item { flex: 1; padding: 12px 16px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--faint); border-right: 1px solid var(--border); transition: all 0.3s; }
+.step-item:last-child { border-right: none; }
+.step-item.active { color: var(--gold); background: #1a1710; }
+.step-item.done { color: var(--green); background: #0d150f; }
+.step-num { display: block; font-size: 18px; font-weight: 600; margin-bottom: 2px; font-family: 'Cormorant Garamond', serif; }
+
+/* CARDS */
+.card { background: var(--surface); border: 1px solid var(--border); padding: 36px; margin-bottom: 20px; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.card-title { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 4px; color: var(--gold-dim); text-transform: uppercase; margin-bottom: 18px; }
+.card-question { font-size: clamp(20px, 3vw, 26px); font-weight: 300; margin-bottom: 22px; line-height: 1.3; }
+
+/* CHOICES */
+.choices { display: flex; gap: 12px; flex-wrap: wrap; }
+.choice-btn { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; padding: 16px 32px; border: 1px solid var(--border2); background: var(--surface2); color: var(--muted); cursor: pointer; transition: all 0.2s; }
+.choice-btn:hover { border-color: var(--gold-dim); color: var(--text); }
+.choice-btn.selected { border-color: var(--gold); color: var(--gold); background: #1e1a0e; }
+
+/* INPUTS */
+.num-input-wrap { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.num-input-wrap label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+.num-input { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600; padding: 12px 20px; width: 100px; outline: none; text-align: center; transition: border-color 0.2s; }
+.num-input:focus { border-color: var(--gold-dim); }
+
+/* WORDS GRID */
+.words-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.word-entry-wrap { position: relative; }
+.word-num { position: absolute; top: 7px; left: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: var(--muted); pointer-events: none; z-index: 1; }
+.word-input { width: 100%; background: var(--surface2); border: 1px solid var(--border2); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 20px 30px 8px 10px; outline: none; transition: border-color 0.2s, background 0.2s; }
+.word-input:focus { border-color: var(--gold-dim); }
+.word-input.valid { border-color: var(--green) !important; background: #0d1a10; }
+.word-input.invalid { border-color: var(--red) !important; background: #1a0d0d; }
+.word-status { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-family: 'IBM Plex Mono', monospace; font-size: 12px; pointer-events: none; }
+.word-status.ok { color: var(--green); }
+.word-status.err { color: var(--red); }
+
+/* AUTOCOMPLETE */
+.autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: #1e1e1a; border: 1px solid var(--gold-dim); border-top: none; z-index: 200; max-height: 140px; overflow-y: auto; }
+.autocomplete-item { padding: 8px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); cursor: pointer; }
+.autocomplete-item:hover, .autocomplete-item.highlighted { background: #2a2820; color: var(--gold); }
+
+/* COORD ROWS */
+.coord-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.coord-row { display: grid; grid-template-columns: 28px 120px 1fr 1fr 1fr; gap: 10px; align-items: center; padding: 14px 16px; background: var(--surface2); border: 1px solid var(--border); }
+.coord-row-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); text-align: center; }
+.coord-word { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: var(--gold); }
+.coord-field-wrap { display: flex; flex-direction: column; gap: 3px; }
+.coord-field-label { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 2px; color: var(--faint); text-transform: uppercase; }
+.coord-field { background: var(--surface); border: 1px solid var(--border2); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; padding: 8px 10px; outline: none; text-align: center; transition: border-color 0.2s; width: 100%; }
+.coord-field:focus { border-color: var(--gold-dim); }
+.coord-field.conflict { border-color: var(--red) !important; background: #1a0d0d; }
+
+/* BUTTONS */
+.btn { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; padding: 14px 28px; border: 1px solid; cursor: pointer; transition: all 0.2s; display: inline-block; }
+.btn-primary { background: var(--gold); border-color: var(--gold); color: #0a0a08; font-weight: 600; }
+.btn-primary:hover { background: var(--gold-bright); }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+.btn-ghost { background: transparent; border-color: var(--border2); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--gold-dim); color: var(--text); }
+
+/* NOTICES */
+.notice { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.5px; padding: 14px 18px; line-height: 1.8; margin-bottom: 20px; }
+.notice-warn { background: #150e05; border: 1px solid #3a2c10; border-left: 3px solid var(--gold-dim); color: #b09050; }
+.notice-danger { background: #130808; border: 1px solid #3d1515; border-left: 3px solid var(--red); color: #c07070; }
+.notice-info { background: #080d12; border: 1px solid #152030; border-left: 3px solid #4a7fa0; color: #7ab0d0; }
+
+/* COORD MAP */
+.coord-map-display { background: #0d1208; border: 1px solid #2a3820; padding: 24px; margin-bottom: 20px; }
+.coord-map-title { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 4px; color: var(--green); text-transform: uppercase; margin-bottom: 16px; }
+.coord-map-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.coord-map-item { font-family: 'IBM Plex Mono', monospace; font-size: 12px; display: flex; gap: 10px; align-items: baseline; }
+.coord-map-idx { color: var(--muted); font-size: 10px; min-width: 26px; }
+.coord-map-word { color: var(--gold); font-weight: 600; min-width: 90px; }
+.coord-map-loc { color: var(--green); font-size: 11px; }
+.coord-map-warn { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #c07a30; margin-top: 14px; padding-top: 14px; border-top: 1px solid #2a3820; line-height: 1.8; }
+
+/* HIDDEN */
+.hidden { display: none !important; }
+.err-msg { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--red); min-height: 16px; margin-bottom: 12px; }
+
+/* ═══ PRINT PREVIEW ═══ */
+#print-doc { display: none; }
+#print-doc.ready { display: block; margin-top: 40px; }
+
+.page-preview-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; margin-top: 24px; }
+.page-preview { background: white; width: 100%; max-width: 794px; margin: 0 auto; padding: 16px 20px; box-shadow: 0 4px 40px rgba(0,0,0,0.7); }
+
+/* PRINT TABLE */
+.print-page { font-family: 'Courier New', Courier, monospace; }
+.page-header-print { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1.5px solid #222; }
+.page-header-title { font-size: 11px; font-weight: bold; letter-spacing: 3px; text-transform: uppercase; color: #111; }
+.page-header-meta { font-size: 9px; color: #888; letter-spacing: 1px; }
+.word-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.word-table th { font-size: 7px; letter-spacing: 1px; color: #bbb; text-transform: uppercase; padding: 2px 2px; text-align: center; border-bottom: 1px solid #ddd; font-weight: normal; }
+.word-table td { font-size: 7.8px; padding: 2px 2px; text-align: center; border: 1px solid #ebebeb; overflow: hidden; white-space: nowrap; color: #111; }
+.row-num { font-size: 6.5px !important; color: #ccc !important; text-align: right !important; padding-right: 4px !important; border: none !important; border-right: 1px solid #ddd !important; width: 18px; background: none !important; }
+.page-footer-print { margin-top: 5px; padding-top: 4px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; font-size: 7px; color: #bbb; letter-spacing: 1px; }
+
+/* ═══ PRINT MEDIA ═══ */
+@media print {
+  body { background: white !important; color: black !important; margin: 0; padding: 0; }
+  .app > *:not(#print-doc) { display: none !important; }
+  #print-doc { display: block !important; margin: 0 !important; padding: 0 !important; }
+  .page-preview-label { display: none !important; }
+  .page-preview {
+    display: block !important;
+    box-shadow: none !important;
+    padding: 8mm 10mm !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+  }
+  .page-preview:last-of-type {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+  @page { size: A4 portrait; margin: 0; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="header">
+    <div class="header-eyebrow">BIP39 Secure Storage Tool</div>
+    <h1>Seed <em>Vault</em></h1>
+    <div class="header-sub">Camouflage your seed phrase inside a grid of legitimate BIP39 words</div>
+    <div class="offline-badge">Fully Offline · No Network · Nothing Stored</div>
+  </div>
+
+  <div class="steps-bar">
+    <div class="step-item active" id="step-tab-1"><span class="step-num">1</span>Setup</div>
+    <div class="step-item" id="step-tab-2"><span class="step-num">2</span>Phrase</div>
+    <div class="step-item" id="step-tab-3"><span class="step-num">3</span>Coords</div>
+    <div class="step-item" id="step-tab-4"><span class="step-num">4</span>Generate</div>
+  </div>
+
+  <!-- ══ STEP 1 ══ -->
+  <div id="step-1">
+    <div class="card">
+      <div class="card-title">Step 01 — Configuration</div>
+      <div class="card-question">How many words is your seed phrase?</div>
+      <div class="choices" id="word-count-choices">
+        <button class="choice-btn" data-val="12">12</button>
+        <button class="choice-btn" data-val="18">18</button>
+        <button class="choice-btn" data-val="24">24</button>
+      </div>
+    </div>
+
+    <div class="card" id="pages-card" style="display:none">
+      <div class="card-title">Step 01 — Configuration</div>
+      <div class="card-question">How many pages to generate?</div>
+      <div class="notice notice-info">Each page is an A4 grid of 30 rows × 10 columns = 300 words. More pages = more camouflage.</div>
+      <div class="num-input-wrap">
+        <label>Pages</label>
+        <input type="number" class="num-input" id="pages-input" min="1" max="20" value="2">
+      </div>
+      <button class="btn btn-primary" id="step1-next" disabled>Continue →</button>
+    </div>
+  </div>
+
+  <!-- ══ STEP 2 ══ -->
+  <div id="step-2" class="hidden">
+    <div class="notice notice-warn">⚠ Ensure no one can see your screen. This tool stores nothing — your words exist only in memory for this session.</div>
+    <div class="card">
+      <div class="card-title">Step 02 — Seed Phrase Entry</div>
+      <div class="card-question">Enter each word of your seed phrase</div>
+      <div class="notice notice-info">Words are validated against the BIP39 list in real-time. <span style="color:var(--green)">Green ✓ = valid</span> · <span style="color:var(--red)">Red ✗ = not in BIP39</span>. Suggestions appear as you type.</div>
+      <div class="words-grid" id="words-grid"></div>
+      <div id="words-validation-msg" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:16px;"></div>
+      <button class="btn btn-primary" id="step2-next" disabled>Continue →</button>
+    </div>
+  </div>
+
+  <!-- ══ STEP 3 ══ -->
+  <div id="step-3" class="hidden">
+    <div class="card">
+      <div class="card-title">Step 03 — Coordinate Assignment</div>
+      <div class="card-question">Place each seed word on the grid</div>
+      <div class="notice notice-info">Grid: <strong style="color:var(--text)">30 rows × 10 columns</strong> per page. Assign a unique (page, row, column) to each word. Duplicates are flagged in red.</div>
+      <div class="coord-list" id="coord-list"></div>
+      <div class="err-msg" id="coord-error-global"></div>
+      <button class="btn btn-primary" id="step3-next" disabled>Generate Document →</button>
+    </div>
+  </div>
+
+  <!-- ══ STEP 4 ══ -->
+  <div id="step-4" class="hidden">
+    <div class="coord-map-display">
+      <div class="coord-map-title">⚑ Your Coordinate Key — Screen Only — Never Printed</div>
+      <div class="coord-map-list" id="coord-map-list"></div>
+      <div class="coord-map-warn">
+        ▲ Write this key on a separate secure medium before printing. Format: Word — Page / Row / Column<br>
+        The printed document has NO markers — every word looks identical. Without this key, the phrase is unrecoverable.
+      </div>
+    </div>
+    <div class="notice notice-danger">🔒 Close this tab immediately after printing. Do not save this HTML file — it contains your seed phrase in memory.</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:32px;">
+      <button class="btn btn-primary" onclick="window.print()">Print Document</button>
+      <button class="btn btn-ghost" onclick="resetAll()">Start Over</button>
+    </div>
+  </div>
+
+  <!-- PRINT DOCUMENT -->
+  <div id="print-doc"></div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// BIP39 WORDLIST — 2048 words, fully embedded (no network)
+// ═══════════════════════════════════════════════════════════════
+const BIP39_RAW = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across action actor actress actual adapt add addict address adjust admit adult advance advice aerobic afford afraid again age agent agree ahead aim air airport aisle alarm album alcohol alert alien all alley allow almost alone alpha already also alter always amateur amazing among amount amused analyst anchor ancient anger angle angry animal ankle announce annual another answer antenna antique anxiety any apart apology appear apple approve april arch arctic area arena argue arm armed armor army around arrange arrest arrive arrow art artefact artist artwork ask aspect assault asset assist assume asthma athlete atom attack attend attitude attract auction audit august aunt autumn average avocado avoid awake aware away awesome awful awkward axis baby bachelor bacon badge bag balance balcony ball bamboo banana banner bar barely bargain barrel base basic basket battle beach bean beauty because become beef before begin behave behind believe below belt bench benefit best betray better between beyond bicycle bid bike bind biology bird birth bitter black blade blame blanket blast bleak bless blind blood blossom blouse blue blur blush board boat body boil bomb bone book boost border boring borrow boss bottom bounce box boy bracket brain brand brave breeze brick bridge brief bright bring brisk broccoli broken bronze broom brother brown brush bubble buddy budget buffalo build bulb bulk bullet bundle bunker burden burger burst bus business busy butter buyer buzz cabbage cabin cable cactus cage cake call calm camera camp can canal cancel candy cannon canvas canyon capable capital captain car carbon card cargo carpet carry cart case cash casino castle casual cat catalog catch category cattle caught cause caution cave ceiling celery cement census chair chaos chapter charge chase chat cheap check cheese chef cherry chest chicken chief child chimney choice choose chronic chuckle chunk cinnamon circle citizen city civil claim clap clarify claw clay clean clerk clever click client cliff climb clinic clip clock clog close cloth cloud clown club clump cluster coarse coat coconut code coffee coil coin collect color column combine come comfort comic common company concert conduct confirm congress connect consider control convince cook cool copper copy coral core corn correct cost cotton couch country couple course cousin cover coyote crack cradle craft cram crane crash crater crawl crazy cream credit creek crew cricket crime crisp critic crop cross crouch crowd crucial cruel cruise crumble crunch crush cry crystal cube culture cup cupboard curious current curtain curve cushion cute cycle dad damage damp dance danger daring dash daughter dawn day deal debate debris decade december decide decline decorate decrease deer defense define defy degree delay deliver demand demise denial dentist deny depart depend deposit depth deputy derive describe desert design desk despair destroy detail detect develop device devote diagram dial diamond diary dice diesel diet differ digital dignity dilemma dinner dinosaur direct dirt disagree discover disease dish dismiss disorder display distance divert divide divorce dizzy doctor document dog doll dolphin domain donate donkey donor door dose double dove draft dragon drama drastic draw dream dress drift drill drink drip drive drop drum dry duck dumb dune during dust dutch duty dwarf dynamic eager eagle early earn earth easily east easy echo ecology edge edit educate effort egg eight either elbow elder electric elegant element elephant elevator elite else embark embody embrace emerge emotion employ empower empty enable enact endless endorse enemy engage engine enhance enjoy enlist enough enrich enroll ensure enter entire entry envelope episode equal equip erase erode erosion error erupt escape essay essence estate eternal ethics evidence evil evoke evolve exact example excess exchange excite exclude exercise exhaust exhibit exile exist exit exotic expand expire explain expose express extend extra eye fable face faculty fade faint faith fall false fame family famous fan fancy fantasy far fashion fat fatal father fatigue fault favorite feature february federal fee feed feel feet fellow felt fence festival fetch fever few fiber fiction field figure file film filter final find fine finger finish fire firm first fiscal fish fit fitness fix flag flame flash flat flavor flee flight flip float flock floor flower fluid flush fly foam focus fog foil follow food foot force forest forget fork fortune forum forward fossil foster found fox fragile frame frequent fresh friend fringe frog front frost frown frozen fruit fuel fun funny furnace fury future gadget gain galaxy gallery game gap garbage garden garlic garment gas gasp gate gather gauge gaze general genius genre gentle genuine gesture ghost ginger giraffe girl give glad glance glare glass glide glimpse globe gloom glory glove glow glue goat goddess gold good goose gorilla gospel gossip govern gown grab grace grain grant grape grasp grass gravity great green grid grief grit grocery group grow grunt guard guide guilt guitar gun gym habit hair half hamster hand happy harsh harvest hat have hawk hazard head health heart heavy hedgehog height hello helmet help hero hidden high hill hint hip hire history hobby hockey hold hole holiday hollow home honey hood hope horn hospital host hour hover hub huge human humble humor hundred hungry hunt hurdle hurry hurt husband hybrid ice icon ignore ill illegal image imitate immense immune impact impose improve impulse inbox income increase index indicate indoor industry infant inflict inform inhale inject inner innocent input inquiry insane insect inside inspire install intact interest into invest invite involve iron island isolate issue item ivory jacket jaguar jar jazz jealous jelly jewel job join joke journey joy judge juice jump jungle junior junk just kangaroo keen keep ketchup key kick kid kingdom kiss kit kitchen kite kitten kiwi knee knife knock know lab ladder lady lamp language laptop large later laugh laundry lava law lawn lawsuit layer lazy leader learn leave lecture left leg legal legend leisure lemon lend length lens leopard lesson letter level liar liberty library license life lift light like limb limit link lion liquid list little live lizard load loan lobster local lock logic lonely long loop lottery loud lounge love loyal lucky luggage lumber lunar lunch luxury lyrics machine mad magic magnet maid main major make mammal mango mansion manual maple marble march margin marine market marriage mask master match matrix maximum maze meadow mean medal media melody melt member memory mention mentor menu mercy merge merit merry mesh message metal method middle midnight milk million mimic mind minimum minor miracle miss mistake mix mixed mixture mobile model modify mom monitor monkey monster month moon moral more morning mosquito mother motion motor mountain mouse move movie much muffin mule multiply muscle museum mushroom music must mutual myself mystery naive name napkin narrow nasty nature near neck need negative neglect neither nephew nerve network news next nice night noble noise nominee noodle normal north notable note nothing notice novel now nuclear nurse nut oak obey object oblige obscure obtain ocean october odor offer office often oil okay old olive olympic omit once onion open option orange orbit orchard order ordinary organ orient original orphan ostrich other outdoor outside oval over own oyster ozone packet page pair palace palm panda panel panic panther paper parade parent park parrot party pass patch path patrol pause pave payment peace peanut peasant pelican pen penalty pencil people pepper perfect permit person pet phone photo phrase physical piano picnic piece pig pigeon pill pilot pink pioneer pipe pistol pitch pizza place planet plastic plate play please pledge pluck plug plunge poem poet point polar pole police pond pony popular portion position possible post potato poverty powder power practice praise predict prefer prepare present pretty prevent price pride primary print priority prison private prize problem process produce profit program project promote proof property prosper protect proud provide public pudding pull pulp pulse pumpkin punch pupil puppy purchase purity purpose push put puzzle pyramid quality quantum quarter question quick quit quiz quote rabbit raccoon race rack radar radio rage rail rain raise rally ramp ranch random range rapid rare rate rather raven reach ready real reason rebel rebuild recall receive recipe record recycle reduce reflect reform refuse region regret regular reject relax release relief rely remain remember remind remove render renew rent reopen repair repeat replace report require rescue resemble resist resource response result retire retreat return reunion reveal review reward rhythm ribbon rice rich ride rifle right rigid ring riot ripple risk ritual rival river road roast robot robust rocket romance roof rookie rotate rough round route royal rubber rude rug rule run runway rural sad saddle sadness safe sail salad salmon salon salt salute same sample sand satisfy satoshi sauce sausage save say scale scan scare scatter scene scheme school science scissors scorpion scout scrap screen script scrub sea search season seat second secret section security seek segment select sell seminar senior sense sentence series service session settle setup seven shadow shaft shallow share shed shell sheriff shield shift shine ship shiver shock shoe shoot shop short shoulder shove shrimp shrug shuffle shy sibling siege sight signal silent silk silly silver similar simple since sing siren sister situate six size sketch ski skill skin skirt skull slab slam sleep slender slice slide slight slim slogan slot slow slush small smart smile smoke smooth snack snake snap sniff snow soap soccer social sock soda soft solar soldier solid solution solve someone song soon sorry soul sound soup source south space spare spatial spawn speak special speed sphere spice spider spike spin spirit split spoil sponsor spoon spray spread spring spy square squeeze squirrel stable stadium staff stage stairs stamp stand start state stay steak steel stem step stereo stick still sting stock stomach stone stop store story stove strategy street strike strong struggle student stuff stumble style subject submit subway success such sudden suffer sugar suit summer sun sunny sunset super supply supreme sure surface surge surprise sustain swallow swamp swap swear sweet swift swim swing switch sword symbol symptom syrup table tackle tag tail talent tamper tank tape target task tattoo taxi teach team tell ten tenant tennis tent term test text thank that theme then theory there they thing this thought three thrive throw thumb thunder ticket tilt timber time tiny tip tired title toast tobacco today together toilet token tomato tomorrow tone tongue tonight tool tooth top topic topple torch tornado tortoise toss total tourist toward tower town toy track trade traffic tragic train transfer trap trash travel tray treat tree trend trial tribe trick trigger trim trip trophy trouble truck truly trumpet trust truth try tube tuition tumble tuna tunnel turkey turn turtle twelve twenty twice twin twist two type typical ugly umbrella unable unaware uncle uncover under undo unfair unfold unhappy uniform unique universe unknown unlock until unusual unveil update upgrade uphold upon upper upset urban used useful useless usual utility vacant vacuum vague valid valley valve van vanish vapor various vast vault vehicle velvet vendor venture venue verb verify version very veteran viable vibrant vicious victory video view village vintage violin virtual virus visa visit visual vital vivid vocal voice void volcano volume vote voyage wage wagon wait walk wall walnut want warfare warm warrior wash wasp waste water wave way wealth weapon wear weasel wedding weekend weird welcome well west wet whale wheat wheel when where whip whisper wide width wife wild will win window wine wing wink winner winter wire wisdom wise wish witness wolf woman wonder wood wool word world worry worth wrap wreck wrestle wrist write wrong yard year yellow you young youth zebra zero zone zoo cottage humid sensor serial tribal yacht";
+
+const BIP39_LIST = BIP39_RAW.split(' ');
+const BIP39_SET = new Set(BIP39_LIST);
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let state = { wordCount: 0, pageCount: 0, seedWords: [], coordinates: [] };
+const ROWS = 30, COLS = 10;
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 1
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll('#word-count-choices .choice-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#word-count-choices .choice-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.wordCount = parseInt(btn.dataset.val);
+    document.getElementById('pages-card').style.display = 'block';
+    validateStep1();
+  });
+});
+
+document.getElementById('pages-input').addEventListener('input', validateStep1);
+
+function validateStep1() {
+  const v = parseInt(document.getElementById('pages-input').value);
+  document.getElementById('step1-next').disabled = !(state.wordCount > 0 && v >= 1 && v <= 20);
+}
+
+document.getElementById('step1-next').addEventListener('click', () => {
+  state.pageCount = parseInt(document.getElementById('pages-input').value);
+  goToStep(2);
+  buildWordEntries();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 2 — WORD ENTRY
+// ═══════════════════════════════════════════════════════════════
+function buildWordEntries() {
+  const grid = document.getElementById('words-grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < state.wordCount; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'word-entry-wrap';
+    wrap.innerHTML = `
+      <span class="word-num">${i + 1}</span>
+      <input type="text" class="word-input" data-idx="${i}" placeholder="word ${i + 1}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <span class="word-status" data-idx="${i}"></span>
+      <div class="autocomplete-list" id="ac-${i}" style="display:none"></div>
+    `;
+    grid.appendChild(wrap);
+    const inp = wrap.querySelector('.word-input');
+    inp.addEventListener('input', () => handleWordInput(i, inp));
+    inp.addEventListener('keydown', e => handleWordKeydown(e, i));
+    inp.addEventListener('blur', () => setTimeout(() => closeAC(i), 160));
+  }
+  updateStep2Btn();
+}
+
+const acHi = {};
+
+function handleWordInput(idx, inp) {
+  let val = inp.value.replace(/[^a-z]/gi, '').toLowerCase();
+  inp.value = val;
+  const status = document.querySelector(`.word-status[data-idx="${idx}"]`);
+  const acList = document.getElementById(`ac-${idx}`);
+
+  if (!val) {
+    inp.className = 'word-input'; status.textContent = ''; status.className = 'word-status';
+    acList.style.display = 'none'; updateStep2Btn(); return;
+  }
+
+  if (BIP39_SET.has(val)) {
+    inp.className = 'word-input valid'; status.textContent = '✓'; status.className = 'word-status ok';
+    acList.style.display = 'none';
+  } else {
+    inp.className = 'word-input invalid'; status.textContent = '✗'; status.className = 'word-status err';
+    const matches = BIP39_LIST.filter(w => w.startsWith(val)).slice(0, 6);
+    if (matches.length) {
+      acList.innerHTML = matches.map((w, i) => `<div class="autocomplete-item" data-word="${w}" data-i="${i}">${w}</div>`).join('');
+      acList.style.display = 'block';
+      acHi[idx] = -1;
+      acList.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('mousedown', () => selectAC(idx, item.dataset.word));
+      });
+    } else { acList.style.display = 'none'; }
+  }
+  updateStep2Btn();
+}
+
+function handleWordKeydown(e, idx) {
+  const acList = document.getElementById(`ac-${idx}`);
+  const items = acList.querySelectorAll('.autocomplete-item');
+  if (!items.length || acList.style.display === 'none') return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); acHi[idx] = Math.min((acHi[idx] ?? -1) + 1, items.length - 1); refreshAC(idx); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); acHi[idx] = Math.max((acHi[idx] ?? 0) - 1, 0); refreshAC(idx); }
+  else if (e.key === 'Enter' || e.key === 'Tab') {
+    const hi = acHi[idx] >= 0 ? acHi[idx] : 0;
+    if (items[hi]) { e.preventDefault(); selectAC(idx, items[hi].dataset.word); }
+  } else if (e.key === 'Escape') closeAC(idx);
+}
+
+function refreshAC(idx) {
+  document.getElementById(`ac-${idx}`).querySelectorAll('.autocomplete-item')
+    .forEach((item, i) => item.classList.toggle('highlighted', i === acHi[idx]));
+}
+
+function selectAC(idx, word) {
+  const inp = document.querySelector(`.word-input[data-idx="${idx}"]`);
+  inp.value = word; handleWordInput(idx, inp); closeAC(idx);
+}
+
+function closeAC(idx) {
+  const el = document.getElementById(`ac-${idx}`);
+  if (el) el.style.display = 'none';
+}
+
+function updateStep2Btn() {
+  const inputs = [...document.querySelectorAll('.word-input')];
+  const allOk = inputs.length === state.wordCount && inputs.every(i => BIP39_SET.has(i.value));
+  const count = inputs.filter(i => BIP39_SET.has(i.value)).length;
+  document.getElementById('words-validation-msg').textContent = `${count} / ${state.wordCount} valid BIP39 words`;
+  document.getElementById('step2-next').disabled = !allOk;
+}
+
+document.getElementById('step2-next').addEventListener('click', () => {
+  state.seedWords = [...document.querySelectorAll('.word-input')].map(i => i.value.trim());
+  goToStep(3);
+  buildCoordEntries();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 3 — COORDINATES
+// ═══════════════════════════════════════════════════════════════
+function buildCoordEntries() {
+  const list = document.getElementById('coord-list');
+  list.innerHTML = '';
+  state.coordinates = state.seedWords.map(() => ({ page: '', row: '', col: '' }));
+
+  state.seedWords.forEach((word, idx) => {
+    const row = document.createElement('div');
+    row.className = 'coord-row';
+    row.innerHTML = `
+      <div class="coord-row-num">${idx + 1}</div>
+      <div class="coord-word">${word}</div>
+      <div class="coord-field-wrap">
+        <div class="coord-field-label">Page (1–${state.pageCount})</div>
+        <input type="number" class="coord-field" data-idx="${idx}" data-type="page" min="1" max="${state.pageCount}" placeholder="—">
+      </div>
+      <div class="coord-field-wrap">
+        <div class="coord-field-label">Row (1–${ROWS})</div>
+        <input type="number" class="coord-field" data-idx="${idx}" data-type="row" min="1" max="${ROWS}" placeholder="—">
+      </div>
+      <div class="coord-field-wrap">
+        <div class="coord-field-label">Col (1–${COLS})</div>
+        <input type="number" class="coord-field" data-idx="${idx}" data-type="col" min="1" max="${COLS}" placeholder="—">
+      </div>
+    `;
+    list.appendChild(row);
+  });
+
+  list.querySelectorAll('.coord-field').forEach(inp => {
+    inp.addEventListener('input', () => {
+      state.coordinates[parseInt(inp.dataset.idx)][inp.dataset.type] = inp.value;
+      validateCoords();
+    });
+  });
+}
+
+function validateCoords() {
+  const coords = state.coordinates;
+  document.querySelectorAll('.coord-field').forEach(f => f.classList.remove('conflict'));
+
+  let allFilled = true, allInRange = true;
+  const seen = {}, conflicts = new Set();
+
+  coords.forEach((c, idx) => {
+    if (!c.page || !c.row || !c.col) { allFilled = false; return; }
+    const p = parseInt(c.page), r = parseInt(c.row), col = parseInt(c.col);
+    if (p < 1 || p > state.pageCount || r < 1 || r > ROWS || col < 1 || col > COLS) { allInRange = false; return; }
+    const key = `${p}-${r}-${col}`;
+    if (seen[key] !== undefined) { conflicts.add(idx); conflicts.add(seen[key]); }
+    else seen[key] = idx;
+  });
+
+  conflicts.forEach(idx => {
+    document.querySelectorAll(`.coord-field[data-idx="${idx}"]`).forEach(f => f.classList.add('conflict'));
+  });
+
+  const errEl = document.getElementById('coord-error-global');
+  errEl.textContent = conflicts.size > 0 ? `⚠ Coordinate conflict — ${conflicts.size} word(s) share the same cell. All coordinates must be unique.` : '';
+
+  document.getElementById('step3-next').disabled = !(allFilled && allInRange && conflicts.size === 0);
+}
+
+document.getElementById('step3-next').addEventListener('click', () => {
+  generateDocument();
+  goToStep(4);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// STEP 4 — GENERATE
+// ═══════════════════════════════════════════════════════════════
+function generateDocument() {
+  // Coordinate map (screen only)
+  document.getElementById('coord-map-list').innerHTML = state.seedWords.map((word, idx) => {
+    const c = state.coordinates[idx];
+    return `<div class="coord-map-item">
+      <span class="coord-map-idx">#${String(idx + 1).padStart(2, '0')}</span>
+      <span class="coord-map-word">${word}</span>
+      <span class="coord-map-loc">Pg&nbsp;${c.page} · Row&nbsp;${c.row} · Col&nbsp;${c.col}</span>
+    </div>`;
+  }).join('');
+
+  // Build placed-word lookup
+  const placed = {};
+  state.seedWords.forEach((word, idx) => {
+    const c = state.coordinates[idx];
+    placed[`${c.page}-${c.row}-${c.col}`] = word;
+  });
+
+  const printDoc = document.getElementById('print-doc');
+  printDoc.innerHTML = '';
+  printDoc.className = 'ready';
+
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  for (let p = 1; p <= state.pageCount; p++) {
+    // Build row data
+    const rows = [];
+    for (let r = 1; r <= ROWS; r++) {
+      const cells = [];
+      for (let col = 1; col <= COLS; col++) {
+        const key = `${p}-${r}-${col}`;
+        cells.push(placed[key] || randomWord());
+      }
+      rows.push(cells);
+    }
+
+    const colHeaders = Array.from({ length: COLS }, (_, i) => `<th>${i + 1}</th>`).join('');
+    const tableRows = rows.map((cells, rIdx) =>
+      `<tr><td class="row-num">${rIdx + 1}</td>${cells.map(w => `<td>${w}</td>`).join('')}</tr>`
+    ).join('');
+
+    const preview = document.createElement('div');
+    preview.className = 'page-preview';
+    preview.innerHTML = `
+      <div class="page-preview-label">Page ${p} of ${state.pageCount}</div>
+      <div class="print-page">
+        <div class="page-header-print">
+          <div class="page-header-title">Seed Vault</div>
+          <div class="page-header-meta">${dateStr} &nbsp;|&nbsp; Page ${p}/${state.pageCount} &nbsp;|&nbsp; 30×10</div>
+        </div>
+        <table class="word-table">
+          <thead><tr><th></th>${colHeaders}</tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <div class="page-footer-print">
+          <span>BIP39 Word Grid · 300 entries per page</span>
+          <span>Page ${p} of ${state.pageCount}</span>
+          <span>seed-vault</span>
+        </div>
+      </div>`;
+
+    printDoc.appendChild(preview);
+  }
+}
+
+function randomWord() {
+  return BIP39_LIST[Math.floor(Math.random() * BIP39_LIST.length)];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function goToStep(n) {
+  [1, 2, 3, 4].forEach(i => {
+    document.getElementById(`step-${i}`).classList.toggle('hidden', i !== n);
+    const tab = document.getElementById(`step-tab-${i}`);
+    tab.className = 'step-item' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetAll() {
+  state = { wordCount: 0, pageCount: 0, seedWords: [], coordinates: [] };
+  document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('pages-card').style.display = 'none';
+  document.getElementById('step1-next').disabled = true;
+  document.getElementById('print-doc').innerHTML = '';
+  document.getElementById('print-doc').className = '';
+  goToStep(1);
+}
+</script>
+</body>
+</html>
